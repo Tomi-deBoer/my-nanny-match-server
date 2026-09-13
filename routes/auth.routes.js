@@ -1,83 +1,68 @@
 const router = require("express").Router();
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 
-// Temporary hardcoded users
-const users = [
-  {
-    id: 1,
-    email: "parent@test.com",
-    password: "password123",
-    role: "parent"
-  },
-  {
-    id: 2,
-    email: "nanny@test.com",
-    password: "password123",
-    role: "nanny"
-  }
-];
+const User = require("../models/user.model");
 
-// POST /api/auth/login
-router.post("/login", (req, res, next) => {
+router.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
 
   console.log(`Login attempt for: ${email}`);
 
-  // Find the user with the supplied email
-  const user = users.find((user) => user.email === email);
+  try {
+    const user = await User.findOne({ email });
 
-  // User doesn't exist
-  if (!user) {
-    console.log("Login failed: user not found");
+    if (!user) {
+      console.log("Login failed: user not found");
 
-    return res.status(401).json({
-      error: "Invalid email or password"
-    });
-  }
-
-  // Password doesn't match
-  if (user.password !== password) {
-    console.log("Login failed: incorrect password");
-
-    return res.status(401).json({
-      error: "Invalid email or password"
-    });
-  }
-
-  console.log(`Credentials verified for: ${user.email}`);
-
-  // Create JWT
-  const token = jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      role: user.role
-    },
-    process.env.JWT_SECRET,
-    {
-      expiresIn: "1h"
+      return res.status(401).json({
+        error: "Invalid email or password"
+      });
     }
-  );
 
-  console.log(`JWT created successfully for: ${user.email}`);
+    const passwordMatches = await bcrypt.compare(
+      password,
+      user.password
+    );
 
-  // Login successful
-  res.status(200).json({
-    message: "Login successful",
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role
-    },
-    token
-  });
+    if (!passwordMatches) {
+      console.log("Login failed: incorrect password");
+
+      return res.status(401).json({
+        error: "Invalid email or password"
+      });
+    }
+
+    console.log(`Credentials verified for: ${user.email}`);
+
+    const token = jwt.sign(
+      {
+        id: user._id,
+        email: user.email,
+        role: user.role
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    console.log(`JWT created successfully for: ${user.email}`);
+
+    res.status(200).json({
+      message: "Login successful",
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role
+      },
+      token
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
-// GET /api/auth/me
 router.get("/me", (req, res) => {
-  res.json({
-    user: req.user
-  });
+  res.json({ user: req.user });
 });
 
 module.exports = router;
