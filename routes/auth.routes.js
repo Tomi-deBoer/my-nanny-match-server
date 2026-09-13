@@ -1,4 +1,5 @@
 const router = require("express").Router();
+const jwt = require("jsonwebtoken");
 
 // Temporary hardcoded users
 const users = [
@@ -20,11 +21,15 @@ const users = [
 router.post("/login", (req, res, next) => {
   const { email, password } = req.body;
 
+  console.log(`Login attempt for: ${email}`);
+
   // Find the user with the supplied email
   const user = users.find((user) => user.email === email);
 
   // User doesn't exist
   if (!user) {
+    console.log("Login failed: user not found");
+
     return res.status(401).json({
       error: "Invalid email or password"
     });
@@ -32,10 +37,29 @@ router.post("/login", (req, res, next) => {
 
   // Password doesn't match
   if (user.password !== password) {
+    console.log("Login failed: incorrect password");
+
     return res.status(401).json({
       error: "Invalid email or password"
     });
   }
+
+  console.log(`Credentials verified for: ${user.email}`);
+
+  // Create JWT
+  const token = jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "1h"
+    }
+  );
+
+  console.log(`JWT created successfully for: ${user.email}`);
 
   // Login successful
   res.status(200).json({
@@ -44,7 +68,8 @@ router.post("/login", (req, res, next) => {
       id: user.id,
       email: user.email,
       role: user.role
-    }
+    },
+    token
   });
 });
 
