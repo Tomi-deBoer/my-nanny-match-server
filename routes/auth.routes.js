@@ -73,4 +73,11 @@ router.post("/login", (req, res, next) => {
   });
 });
 
+// GET /api/auth/me
+router.get("/me", (req, res) => {
+  res.json({
+    user: req.user
+  });
+});
+
 module.exports = router;
