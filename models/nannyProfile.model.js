@@ -8,6 +8,11 @@ const nannyProfileSchema = new Schema(
       required: true
     },
 
+    profileImage: {
+      type: String,
+      default: ""
+    },
+
     experienceInYears: {
       type: Number,
       required: true,
