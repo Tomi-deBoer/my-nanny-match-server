@@ -48,4 +48,30 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+router.get("/:id", async (req, res, next) => {
+  try {
+    const nanny = await NannyProfile.findById(req.params.id)
+      .populate("userId", "name");
+
+    if (!nanny) {
+      return res.status(404).json({
+        error: "Nanny profile not found"
+      });
+    }
+
+    res.json({
+      id: nanny._id,
+      name: nanny.userId.name,
+      profileImage: nanny.profileImage,
+      experienceInYears: nanny.experienceInYears,
+      hourlyRate: nanny.hourlyRate,
+      skills: nanny.skills,
+      availability: nanny.availability,
+      isVerified: nanny.isVerified
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
