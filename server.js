@@ -1,20 +1,24 @@
 //
 // ℹ️ Loads environment variables from a .env file into process.env
 //
+const logger = require("./utils/logger");
+
 try {
   process.loadEnvFile();
-  console.log("MONGODB_URI:", process.env.MONGODB_URI);
+
+  logger.info("Environment variables loaded successfully.");
 } catch (error) {
-  console.warn(".env file not found, using default environment values");
+  logger.warn(".env file not found, using default environment values");
 }
 
 
 //
-// Imports Express and initializes the server
+// ℹ️ Imports Express and initializes the server
 //
 const express = require("express");
 const cors = require("cors");
 const app = express();
+
 app.use(cors());
 
 
@@ -79,5 +83,5 @@ handleErrors(app);
 const PORT = process.env.PORT || 5005;
 
 app.listen(PORT, () => {
-  console.log(`Server listening. Local access on http://localhost:${PORT}`);
+  logger.info(`Server listening on port ${PORT}.`);
 });
