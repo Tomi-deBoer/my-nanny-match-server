@@ -2,9 +2,10 @@ const jwt = require("jsonwebtoken");
 
 function authMiddleware(req, res, next) {
   // Public route - login does not require authentication
-  if (
-  req.path === "/api/auth/login")
-  {
+if (
+  req.path === "/api/auth/login" ||
+  (req.path === "/api/users" && req.method === "POST")
+) {
     return next();
   }
 
