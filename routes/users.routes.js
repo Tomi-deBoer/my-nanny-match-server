@@ -2,9 +2,14 @@ const router = require("express").Router();
 const bcrypt = require("bcrypt");
 
 const User = require("../models/user.model");
+const requireAdmin = require("../middleware/admin.middleware");
 
 
-// CREATE USER / REGISTER
+// ============================================================
+// PUBLIC REGISTRATION
+// POST /api/users
+// ============================================================
+
 router.post("/", async (req, res, next) => {
   try {
     const {
@@ -23,8 +28,9 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    // Only these roles can be created through public registration.
-    // Admin accounts must never be created through this endpoint.
+    // Public registration can only create
+    // parent or nanny accounts.
+    // Admin accounts must never be created publicly.
     if (!["parent", "nanny"].includes(role)) {
       return res.status(400).json({
         message: "Invalid account role."
@@ -38,9 +44,12 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    // Check whether the email is already registered
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check whether the email already exists
     const existingUser = await User.findOne({
-      email: email.toLowerCase().trim()
+      email: normalizedEmail
     });
 
     if (existingUser) {
@@ -49,19 +58,19 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    // Hash the password before storing it
+    // Hash password before storing it
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create the user
+    // Create user
     const user = await User.create({
       name: name.trim(),
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       phoneNr: phoneNr.trim(),
       password: hashedPassword,
       role
     });
 
-    // Never send the password back to the client
+    // Never return the password
     res.status(201).json({
       message: "Account created successfully.",
       user: {
@@ -71,6 +80,177 @@ router.post("/", async (req, res, next) => {
         phoneNr: user.phoneNr,
         role: user.role
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+// ============================================================
+// ADMIN USER MANAGEMENT
+// Everything below this point requires an admin account.
+// ============================================================
+
+router.use(requireAdmin);
+
+
+// ============================================================
+// GET ALL USERS
+// GET /api/users
+// ============================================================
+
+router.get("/", async (req, res, next) => {
+  try {
+    const users = await User.find()
+      .select("-password")
+      .sort({ createdAt: -1 });
+
+    res.json(users);
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+// ============================================================
+// GET ONE USER
+// GET /api/users/:id
+// ============================================================
+
+router.get("/:id", async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found."
+      });
+    }
+
+    res.json(user);
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+// ============================================================
+// UPDATE USER
+// PUT /api/users/:id
+// ============================================================
+
+router.put("/:id", async (req, res, next) => {
+  try {
+    const {
+      name,
+      email,
+      phoneNr,
+      password,
+      role
+    } = req.body;
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found."
+      });
+    }
+
+    // Prevent an admin from removing their own admin role
+    if (
+      user._id.toString() === req.user.id &&
+      role &&
+      role !== "admin"
+    ) {
+      return res.status(400).json({
+        message: "You cannot remove your own admin role."
+      });
+    }
+
+    // Validate role if supplied
+    if (
+      role &&
+      !["parent", "nanny", "admin"].includes(role)
+    ) {
+      return res.status(400).json({
+        message: "Invalid account role."
+      });
+    }
+
+    // Validate password if supplied
+    if (password !== undefined) {
+      if (password.length < 8) {
+        return res.status(400).json({
+          message: "Password must be at least 8 characters long."
+        });
+      }
+
+      user.password = await bcrypt.hash(password, 10);
+    }
+
+    // Update supplied fields
+    if (name !== undefined) {
+      user.name = name.trim();
+    }
+
+    if (email !== undefined) {
+      user.email = email.toLowerCase().trim();
+    }
+
+    if (phoneNr !== undefined) {
+      user.phoneNr = phoneNr.trim();
+    }
+
+    if (role !== undefined) {
+      user.role = role;
+    }
+
+    await user.save();
+
+    // Never return the password
+    const userResponse = user.toObject();
+
+    delete userResponse.password;
+
+    res.json({
+      message: "User updated successfully.",
+      user: userResponse
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+// ============================================================
+// DELETE USER
+// DELETE /api/users/:id
+// ============================================================
+
+router.delete("/:id", async (req, res, next) => {
+  try {
+    // Prevent an admin from deleting themselves
+    if (req.params.id === req.user.id) {
+      return res.status(400).json({
+        message: "You cannot delete your own account."
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found."
+      });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+
+    res.json({
+      message: "User deleted successfully."
     });
   } catch (error) {
     next(error);
