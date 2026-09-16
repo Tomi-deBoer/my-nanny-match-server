@@ -72,33 +72,44 @@ router.get("/:id", async (req, res, next) => {
 // UPDATE booking
 router.put("/:id", async (req, res, next) => {
   try {
-    const { nannyId, date, startTime, endTime, status, message } =
-      req.body;
+    const {
+      date,
+      startTime,
+      endTime,
+      message
+    } = req.body;
 
-    const booking = await Booking.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        parentId: req.user.id
-      },
-      {
-        nannyId,
-        date,
-        startTime,
-        endTime,
-        status,
-        message
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    ).populate("nannyId");
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      parentId: req.user.id
+    });
 
     if (!booking) {
       return res.status(404).json({
         error: "Booking not found"
       });
     }
+
+    if (booking.status === "cancelled") {
+      return res.status(400).json({
+        error: "Cancelled bookings cannot be updated."
+      });
+    }
+
+    booking.date = date;
+    booking.startTime = startTime;
+    booking.endTime = endTime;
+    booking.message = message;
+
+    // If a confirmed booking is changed,
+    // it needs to be confirmed again.
+    if (booking.status === "confirmed") {
+      booking.status = "pending";
+    }
+
+    await booking.save();
+
+    await booking.populate("nannyId");
 
     res.json(booking);
   } catch (error) {
