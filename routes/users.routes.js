@@ -2,6 +2,7 @@ const router = require("express").Router();
 const bcrypt = require("bcrypt");
 
 const User = require("../models/user.model");
+const NannyProfile = require("../models/nannyProfile.model");
 const requireAdmin = require("../middleware/admin.middleware");
 
 
@@ -69,6 +70,16 @@ router.post("/", async (req, res, next) => {
       password: hashedPassword,
       role
     });
+
+    // Create a nanny profile automatically
+    // when the user registers as a nanny.
+    if (role === "nanny") {
+      await NannyProfile.create({
+        userId: user._id,
+        experienceInYears: 0,
+        hourlyRate: 0
+      });
+    }
 
     // Never return the password
     res.status(201).json({
